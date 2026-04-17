@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICBM2 Intelligence Hub — 뉴스</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- ─── Header ──────────────────────────────────────────────────────── -->
+    <header class="header">
+        <div class="container header-inner">
+            <div class="header-title">
+                <span class="icon">🚀</span>
+                ICBM2 Intelligence Hub
+            </div>
+            <nav class="tabs">
+                <a href="/" class="tab">대시보드</a>
+                <a href="/static/news.html" class="tab active">뉴스</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ─── Main Content ────────────────────────────────────────────────── -->
+    <main class="container mt-24">
+
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">📰 GitHub 트렌딩 뉴스</div>
+                <div class="period-toggle">
+                    <button class="period-btn active" data-period="daily" onclick="switchPeriod('daily', this)">일간</button>
+                    <button class="period-btn" data-period="weekly" onclick="switchPeriod('weekly', this)">주간</button>
+                </div>
+            </div>
+
+            <!-- 필터 바 -->
+            <div class="filter-bar" id="filterBar">
+                <button class="filter-btn active" data-keyword="" onclick="filterCards('', this)">전체</button>
+                <button class="filter-btn" data-keyword="ai" onclick="filterCards('ai', this)">AI</button>
+                <button class="filter-btn" data-keyword="ios" onclick="filterCards('ios', this)">iOS</button>
+                <button class="filter-btn" data-keyword="swift" onclick="filterCards('swift', this)">Swift</button>
+                <button class="filter-btn" data-keyword="llm" onclick="filterCards('llm', this)">LLM</button>
+                <button class="filter-btn" data-keyword="agent" onclick="filterCards('agent', this)">Agent</button>
+            </div>
+
+            <!-- 카드 그리드 -->
+            <div id="newsLoading" class="spinner-wrapper">
+                <div class="spinner"></div>
+                <span>트렌딩 리포지토리를 불러오는 중...</span>
+            </div>
+
+            <div id="newsContainer" style="display:none;">
+                <div class="repo-card-grid" id="newsGrid"></div>
+            </div>
+
+            <div id="newsEmpty" class="empty-state" style="display:none;">
+                <div class="icon">📭</div>
+                <div class="message">해당 조건에 맞는 리포지토리가 없습니다</div>
+            </div>
+
+            <div id="newsError" class="error-state" style="display:none;">
+                <div class="icon">⚠️</div>
+                <div class="message">데이터를 불러올 수 없습니다</div>
+                <button class="retry-btn" onclick="loadTrending()">다시 시도</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="/static/js/news.js"></script>
+</body>
+</html>

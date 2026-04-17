@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICBM2 Intelligence Hub</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <!-- ─── Header ──────────────────────────────────────────────────────── -->
+    <header class="header">
+        <div class="container header-inner">
+            <div class="header-title">
+                <span class="icon">🚀</span>
+                ICBM2 Intelligence Hub
+            </div>
+            <nav class="tabs">
+                <a href="/" class="tab active">대시보드</a>
+                <a href="/static/news.html" class="tab">뉴스</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ─── Main Content ────────────────────────────────────────────────── -->
+    <main class="container">
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+
+            <!-- 좌측: 성과 차트 -->
+            <div class="card" id="chartCard">
+                <div class="card-title">
+                    📊 일별 성과 추이
+                    <span class="badge" style="background: var(--accent); color: #fff;">실시간</span>
+                </div>
+                <div id="chartLoading" class="spinner-wrapper">
+                    <div class="spinner"></div>
+                    <span>성과 데이터를 불러오는 중...</span>
+                </div>
+                <div class="chart-container" id="chartContainer" style="display:none;">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+                <div id="chartError" class="error-state" style="display:none;">
+                    <div class="icon">⚠️</div>
+                    <div class="message">성과 데이터를 불러올 수 없습니다</div>
+                    <button class="retry-btn" onclick="fetchDashboardData()">다시 시도</button>
+                </div>
+            </div>
+
+            <!-- 우측: AI 모델 트래커 -->
+            <div class="card" id="modelsCard">
+                <div class="card-title">
+                    🤖 AI 모델 트래커
+                    <span class="badge" style="background: var(--success); color: #fff;">Notion</span>
+                </div>
+                <div id="modelsLoading" class="spinner-wrapper">
+                    <div class="spinner"></div>
+                    <span>AI 모델 데이터를 불러오는 중...</span>
+                </div>
+                <div id="modelsContainer" style="display:none;">
+                    <div class="models-table-container" id="modelsTableContainer"></div>
+                </div>
+                <div id="modelsError" class="error-state" style="display:none;">
+                    <div class="icon">⚠️</div>
+                    <div class="message">AI 모델 데이터를 불러올 수 없습니다</div>
+                    <button class="retry-btn" onclick="fetchDashboardData()">다시 시도</button>
+                </div>
+            </div>
+
+            <!-- 하단: GitHub 트렌딩 -->
+            <div class="card dashboard-full" id="trendingCard">
+                <div class="card-title">
+                    🔥 GitHub 트렌딩
+                    <span class="badge" style="background: var(--warning); color: #000;">오늘의 인기</span>
+                </div>
+                <div id="trendingLoading" class="spinner-wrapper">
+                    <div class="spinner"></div>
+                    <span>트렌딩 리포지토리를 불러오는 중...</span>
+                </div>
+                <div id="trendingContainer" style="display:none;">
+                    <div class="repo-card-grid" id="trendingGrid"></div>
+                </div>
+                <div id="trendingError" class="error-state" style="display:none;">
+                    <div class="icon">⚠️</div>
+                    <div class="message">트렌딩 데이터를 불러올 수 없습니다</div>
+                    <button class="retry-btn" onclick="fetchDashboardData()">다시 시도</button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="/static/js/charts.js"></script>
+</body>
+</html>
