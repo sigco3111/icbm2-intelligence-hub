@@ -41,7 +41,7 @@ class GitHubTrendingCrawler:
             github_token: GitHub API 인증 토큰 (기본값: GITHUB_TOKEN 환경변수)
             timeout: HTTP 요청 타임아웃 (초)
         """
-        self.github_token = github_token or os.getenv("GITHUB_TOKEN", "")
+        self.github_token = (github_token or os.getenv("GITHUB_TOKEN", "")).strip()
         self.timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
 
