@@ -3,24 +3,28 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "frontend/**",
-      "use": "@vercel/static"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
     },
     {
-      "source": "/static/(.*)",
-      "destination": "/$1"
+      "src": "/static/css/(.*)",
+      "dest": "/frontend/css/$1"
     },
     {
-      "source": "/",
-      "destination": "/index.html"
+      "src": "/static/js/(.*)",
+      "dest": "/frontend/js/$1"
+    },
+    {
+      "src": "/static/news.html",
+      "dest": "/frontend/news.html"
+    },
+    {
+      "src": "/",
+      "dest": "/frontend/index.html"
     }
   ]
 }
