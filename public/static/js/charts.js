@@ -200,6 +200,7 @@ function renderModels(data) {
     container.innerHTML = models.map(model => {
         const props = model.properties || {};
         const title = extractNotionValue(props[titleKey]) || '제목 없음';
+        const url = extractNotionUrl(props);
         const tags = metaKeys.map(k => {
             const label = getShortLabel(k);
             const val = extractNotionValue(props[k]);
@@ -215,13 +216,16 @@ function renderModels(data) {
             }
         }
 
-        return `
-            <div class="data-card">
-                <div class="data-card-title">${escapeHtml(title)}</div>
-                ${tags ? `<div class="data-card-meta">${tags}</div>` : ''}
-                ${descHtml}
-            </div>
+        const cardInner = `
+            <div class="data-card-title">${escapeHtml(title)}${url ? ' <span class="data-card-link-icon">↗</span>' : ''}</div>
+            ${tags ? `<div class="data-card-meta">${tags}</div>` : ''}
+            ${descHtml}
         `;
+
+        if (url) {
+            return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="data-card data-card--link">${cardInner}</a>`;
+        }
+        return `<div class="data-card">${cardInner}</div>`;
     }).join('');
 }
 
