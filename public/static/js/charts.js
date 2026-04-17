@@ -432,7 +432,28 @@ function createRepoCardHtml(repo) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
+ * Notion properties에서 URL 추출
+ */
+function extractNotionUrl(props) {
+    // URL 키를 직접 찾기
+    const urlKeyCandidates = ['URL', 'url', 'Url', '링크', 'Link', 'link'];
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        const kLower = k.toLowerCase();
+        if (urlKeyCandidates.some(c => c.toLowerCase() === kLower)) {
+            // 스칼라 문자열 URL
+            if (typeof v === 'string' && v.startsWith('http')) return v;
+            // Notion url property
+            if (typeof v === 'object' && v.url) return v.url;
+        }
+    }
+    return null;
+}
+
+/**
  * 범용 Notion 카드 생성
+ * URL이 있으면 카드 전체를 클릭 가능한 링크로 만듭니다.
  * @param {Object} item - Notion page object {id, properties}
  * @param {Object} opts - {titleKeys, metaKeys, descKeys, dateKeys}
  */
@@ -447,6 +468,9 @@ function createNotionCard(item, opts) {
     const dateKey = findFirstKey(allKeys, opts.dateKeys);
 
     const title = extractNotionValue(props[titleKey]) || '제목 없음';
+
+    // URL 추출
+    const url = extractNotionUrl(props);
 
     // 메타 태그 생성
     const tags = [];
@@ -484,13 +508,17 @@ function createNotionCard(item, opts) {
         }
     }
 
-    return `
-        <div class="data-card">
-            <div class="data-card-title">${escapeHtml(title)}</div>
-            ${tags.length ? `<div class="data-card-meta">${tags.join('')}</div>` : ''}
-            ${descHtml}
-        </div>
+    // 카드 내용
+    const cardInner = `
+        <div class="data-card-title">${escapeHtml(title)}${url ? ' <span class="data-card-link-icon">↗</span>' : ''}</div>
+        ${tags.length ? `<div class="data-card-meta">${tags.join('')}</div>` : ''}
+        ${descHtml}
     `;
+
+    if (url) {
+        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="data-card data-card--link">${cardInner}</a>`;
+    }
+    return `<div class="data-card">${cardInner}</div>`;
 }
 
 // ─── Notion 값 추출 헬퍼 ───────────────────────────────────────────────────

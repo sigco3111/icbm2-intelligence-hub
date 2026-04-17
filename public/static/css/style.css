@@ -249,6 +249,38 @@ a:hover {
     border-color: var(--border-light);
 }
 
+/* ─── Link Card (clickable) ──────────────────────────────────────────── */
+.data-card--link {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.data-card--link:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), var(--shadow);
+}
+
+.data-card--link:active {
+    background: var(--bg-card-hover);
+    border-color: var(--accent);
+    transform: scale(0.98);
+}
+
+.data-card--link .data-card-title {
+    color: var(--accent);
+}
+
+.data-card-link-icon {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
 .data-card-title {
     font-size: 0.95rem;
     font-weight: 600;
