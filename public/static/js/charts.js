@@ -558,7 +558,7 @@ function extractNotionDate(props) {
  * 키 이름으로 의미 있는 숫자 필드를 우선 찾기
  */
 function extractNotionNumber(props) {
-    const numKeyCandidates = ['값', 'Value', 'value', '수치', '점수', 'Score', 'score', '전주 대비'];
+    const numKeyCandidates = ['값', 'Value', 'value', '수치', '점수', 'Score', 'score'];
     for (const k of Object.keys(props)) {
         const v = props[k];
         if (v === null || v === undefined) continue;
