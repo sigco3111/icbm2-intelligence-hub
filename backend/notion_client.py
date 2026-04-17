@@ -243,7 +243,7 @@ class NotionClient:
             api_key: Notion Integration API 키 (내부 통합 토큰)
             base_url: Notion API 베이스 URL (기본값: https://api.notion.com/v1/)
         """
-        self._api_key = api_key
+        self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
         # httpx 클라이언트 공통 헤더 설정
