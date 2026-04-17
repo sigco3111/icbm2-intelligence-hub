@@ -1,152 +1,264 @@
 /**
- * ICBM2 Intelligence Hub — Dashboard Charts & Data
+ * ICBM2 Intelligence Hub — Mobile Dashboard
  *
- * 대시보드 메인 페이지의 데이터 로딩, 차트 렌더링, 테이블 생성을 담당합니다.
- * 3개 API 엔드포인트를 병렬로 호출하고 각 영역에 렌더링합니다.
+ * 모바일 최적화 대시보드: 6개 탭 섹션, 카드 레이아웃, Notion 데이터 표시.
+ * 순수 HTML/CSS/JS, Chart.js 사용.
  */
 
 // ─── 전역 상태 ──────────────────────────────────────────────────────────────
 let performanceChartInstance = null;
-let allTrendingRepos = [];
+
+// 각 섹션별 캐시
+const sectionCache = {
+    models: null,
+    performance: null,
+    ios: null,
+    invest: null,
+    learning: null,
+    trending: null,
+};
+
+// 섹션별 API 설정
+const SECTION_CONFIG = {
+    models: {
+        url: '/api/notion/ai-models',
+        dataKey: 'models',
+    },
+    performance: {
+        url: '/api/notion/performance',
+        dataKey: 'performance',
+    },
+    ios: {
+        url: '/api/notion/ios-trends',
+        dataKey: 'ios_trends',
+    },
+    invest: {
+        url: '/api/notion/invest',
+        dataKey: 'invest',
+    },
+    learning: {
+        url: '/api/notion/learning',
+        dataKey: 'learning',
+    },
+    trending: {
+        url: '/api/trending/daily',
+        dataKey: 'repos',
+    },
+};
+
+// 섹션별 ID 매핑
+const SECTION_IDS = {
+    models:      { loading: 'modelsLoading',    content: 'modelsContent',    error: 'modelsError' },
+    performance: { loading: 'chartLoading',     content: 'chartContent',     error: 'chartError' },
+    ios:         { loading: 'iosLoading',       content: 'iosContent',       error: 'iosError' },
+    invest:      { loading: 'investLoading',    content: 'investContent',    error: 'investError' },
+    learning:    { loading: 'learningLoading',  content: 'learningContent',  error: 'learningError' },
+    trending:    { loading: 'trendingLoading',  content: 'trendingContent',  error: 'trendingError' },
+};
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    fetchDashboardData();
+    initTabs();
+    loadAllSections();
+    updateTimestamp();
 });
 
+// ─── 탭 네비게이션 ──────────────────────────────────────────────────────────
+function initTabs() {
+    const nav = document.getElementById('tabNav');
+    nav.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tab-btn');
+        if (!btn) return;
+
+        const tab = btn.dataset.tab;
+        switchTab(tab);
+    });
+}
+
+function switchTab(tab) {
+    // 버튼 active 상태
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // 패널 표시
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById(`panel-${tab}`);
+    if (panel) panel.classList.add('active');
+
+    // 해당 섹션 데이터 로드 (캐시 없으면)
+    if (!sectionCache[tab]) {
+        loadSection(tab);
+    }
+}
+
 // ─── 데이터 로딩 ────────────────────────────────────────────────────────────
-async function fetchDashboardData() {
-    // 로딩 상태 초기화
-    showLoading('chartLoading', 'chartContainer', 'chartError');
-    showLoading('modelsLoading', 'modelsContainer', 'modelsError');
-    showLoading('trendingLoading', 'trendingContainer', 'trendingError');
+async function loadAllSections() {
+    const promises = Object.keys(SECTION_CONFIG).map(key => loadSection(key));
+    await Promise.allSettled(promises);
+}
 
-    const endpoints = [
-        { url: '/api/notion/performance', key: 'performance' },
-        { url: '/api/notion/ai-models', key: 'models' },
-        { url: '/api/trending/daily', key: 'repos' },
-    ];
+async function loadSection(sectionKey) {
+    const config = SECTION_CONFIG[sectionKey];
+    const ids = SECTION_IDS[sectionKey];
+    if (!config || !ids) return;
 
-    const results = await Promise.allSettled(
-        endpoints.map(ep => fetch(ep.url).then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        }))
-    );
+    showLoading(ids.loading, ids.content, ids.error);
 
-    // ─── 성과 차트 ──────────────────────────────────────────────────────
-    if (results[0].status === 'fulfilled') {
-        try {
-            renderPerformanceChart(results[0].value);
-            showContent('chartContainer', 'chartLoading', 'chartError');
-        } catch (e) {
-            console.error('차트 렌더링 오류:', e);
-            showError('chartError', 'chartLoading', 'chartContainer');
-        }
-    } else {
-        console.error('성과 API 오류:', results[0].reason);
-        showError('chartError', 'chartLoading', 'chartContainer');
+    try {
+        const res = await fetch(config.url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        sectionCache[sectionKey] = data;
+        renderSection(sectionKey, data);
+        showContent(ids.content, ids.loading, ids.error);
+    } catch (err) {
+        console.error(`${sectionKey} API 오류:`, err);
+        showError(ids.error, ids.loading, ids.content);
     }
+}
 
-    // ─── AI 모델 테이블 ─────────────────────────────────────────────────
-    if (results[1].status === 'fulfilled') {
-        try {
-            renderAIModels(results[1].value);
-            showContent('modelsContainer', 'modelsLoading', 'modelsError');
-        } catch (e) {
-            console.error('모델 테이블 렌더링 오류:', e);
-            showError('modelsError', 'modelsLoading', 'modelsContainer');
-        }
-    } else {
-        console.error('AI 모델 API 오류:', results[1].reason);
-        showError('modelsError', 'modelsLoading', 'modelsContainer');
-    }
+function retrySection(sectionKey) {
+    sectionCache[sectionKey] = null;
+    loadSection(sectionKey);
+}
 
-    // ─── 트렌딩 카드 ────────────────────────────────────────────────────
-    if (results[2].status === 'fulfilled') {
-        try {
-            renderTrendingCards(results[2].value);
-            showContent('trendingContainer', 'trendingLoading', 'trendingError');
-        } catch (e) {
-            console.error('트렌딩 카드 렌더링 오류:', e);
-            showError('trendingError', 'trendingLoading', 'trendingContainer');
-        }
-    } else {
-        console.error('트렌딩 API 오류:', results[2].reason);
-        showError('trendingError', 'trendingLoading', 'trendingContainer');
+// ─── 섹션 렌더링 디스패치 ──────────────────────────────────────────────────
+function renderSection(sectionKey, data) {
+    switch (sectionKey) {
+        case 'models':      renderModels(data); break;
+        case 'performance': renderPerformanceChart(data); break;
+        case 'ios':         renderIosTrends(data); break;
+        case 'invest':      renderInvest(data); break;
+        case 'learning':    renderLearning(data); break;
+        case 'trending':    renderTrending(data); break;
     }
 }
 
 // ─── UI 상태 전환 헬퍼 ─────────────────────────────────────────────────────
 function showLoading(loadingId, contentId, errorId) {
-    const loading = document.getElementById(loadingId);
-    const content = document.getElementById(contentId);
-    const error = document.getElementById(errorId);
-    if (loading) loading.style.display = '';
-    if (content) content.style.display = 'none';
-    if (error) error.style.display = 'none';
+    const el = (id) => document.getElementById(id);
+    if (el(loadingId)) el(loadingId).style.display = '';
+    if (el(contentId)) el(contentId).style.display = 'none';
+    if (el(errorId)) el(errorId).style.display = 'none';
 }
 
 function showContent(contentId, loadingId, errorId) {
-    const loading = document.getElementById(loadingId);
-    const content = document.getElementById(contentId);
-    const error = document.getElementById(errorId);
-    if (loading) loading.style.display = 'none';
-    if (content) content.style.display = '';
-    if (error) error.style.display = 'none';
+    const el = (id) => document.getElementById(id);
+    if (el(loadingId)) el(loadingId).style.display = 'none';
+    if (el(contentId)) el(contentId).style.display = '';
+    if (el(errorId)) el(errorId).style.display = 'none';
 }
 
 function showError(errorId, loadingId, contentId) {
-    const loading = document.getElementById(loadingId);
-    const content = document.getElementById(contentId);
-    const error = document.getElementById(errorId);
-    if (loading) loading.style.display = 'none';
-    if (content) content.style.display = 'none';
-    if (error) error.style.display = '';
+    const el = (id) => document.getElementById(id);
+    if (el(loadingId)) el(loadingId).style.display = 'none';
+    if (el(contentId)) el(contentId).style.display = 'none';
+    if (el(errorId)) el(errorId).style.display = '';
 }
 
-// ─── 성과 차트 렌더링 ──────────────────────────────────────────────────────
-function renderPerformanceChart(data) {
-    const items = data.performance || [];
+// ═════════════════════════════════════════════════════════════════════════════
+// 섹션별 렌더링
+// ═════════════════════════════════════════════════════════════════════════════
 
-    if (items.length === 0) {
-        // 데이터 없음 fallback
-        document.getElementById('chartContainer').innerHTML = `
-            <div class="empty-state">
-                <div class="icon">📭</div>
-                <div class="message">아직 성과 데이터가 없습니다</div>
-            </div>
-        `;
+// ─── 1. AI 모델 트래커 ─────────────────────────────────────────────────────
+function renderModels(data) {
+    const models = data.models || [];
+    const container = document.getElementById('modelsContent');
+
+    if (models.length === 0) {
+        container.innerHTML = emptyStateHtml('📭', '아직 AI 모델 데이터가 없습니다');
         return;
     }
 
-    const canvas = document.getElementById('performanceChart');
-    const ctx = canvas.getContext('2d');
+    // 속성 키 분석
+    const sampleProps = models[0].properties || {};
+    const keys = Object.keys(sampleProps).filter(
+        k => !['id', 'created_time', 'last_edited_time', 'object', 'cover', 'icon'].includes(k)
+    );
 
-    // 데이터 전처리: 날짜별 그룹핑
-    const dateMap = new Map();
-    for (const item of items) {
-        const props = item.properties || item;
-        const date = props.date || props.Date || '';
-        const value = parseFloat(props.value || props.Value || props.value_num || 0);
-        const category = props.category || props.Category || '기타';
+    // 카드에 표시할 속성: title → 첫 번째 텍스트 필드, 그 다음 3개
+    const titleKey = keys.find(k => {
+        const v = sampleProps[k];
+        // Notion title 객체
+        if (v && typeof v === 'object' && v.title) return true;
+        // 스칼라 문자열 (긴 텍스트 = 제목일 확률 높음)
+        if (typeof v === 'string' && v.length > 10) return true;
+        return false;
+    }) || keys[0];
 
-        if (!date) continue;
+    const metaKeys = keys.filter(k => k !== titleKey).slice(0, 3);
+    const descKey = keys.find(k => {
+        const v = sampleProps[k];
+        if (v && typeof v === 'object' && (v.rich_text || (v.title && k !== titleKey))) return true;
+        // 스칼라 문자열 (URL은 제외)
+        if (typeof v === 'string' && v.length > 20 && !v.startsWith('http')) return true;
+        return false;
+    });
 
-        if (!dateMap.has(date)) {
-            dateMap.set(date, {});
+    container.innerHTML = models.map(model => {
+        const props = model.properties || {};
+        const title = extractNotionValue(props[titleKey]) || '제목 없음';
+        const tags = metaKeys.map(k => {
+            const label = getShortLabel(k);
+            const val = extractNotionValue(props[k]);
+            if (!val) return '';
+            return `<span class="data-card-tag">${escapeHtml(label)} ${escapeHtml(val)}</span>`;
+        }).filter(Boolean).join('');
+
+        let descHtml = '';
+        if (descKey && descKey !== titleKey) {
+            const desc = extractNotionValue(props[descKey]);
+            if (desc) {
+                descHtml = `<div class="data-card-desc">${escapeHtml(desc)}</div>`;
+            }
         }
-        const dateData = dateMap.get(date);
-        dateData[category] = (dateData[category] || 0) + value;
+
+        return `
+            <div class="data-card">
+                <div class="data-card-title">${escapeHtml(title)}</div>
+                ${tags ? `<div class="data-card-meta">${tags}</div>` : ''}
+                ${descHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+// ─── 2. 성과 대시보드 (Chart.js) ───────────────────────────────────────────
+function renderPerformanceChart(data) {
+    const items = data.performance || [];
+    const container = document.getElementById('chartContent');
+
+    if (items.length === 0) {
+        container.innerHTML = `<div class="chart-card">${emptyStateHtml('📭', '아직 성과 데이터가 없습니다')}</div>`;
+        return;
     }
 
-    const dates = [...dateMap.keys()].sort();
-    const categories = [...new Set(items.map(item => {
-        const props = item.properties || item;
-        return props.category || props.Category || '기타';
-    }))];
+    // Notion property 처리
+    const dateMap = new Map();
+    const categorySet = new Set();
 
-    // 카테고리별 색상
+    for (const item of items) {
+        const props = item.properties || item;
+        const rawDate = extractNotionDate(props);
+        const rawValue = extractNotionNumber(props);
+        const category = extractNotionCategory(props);
+
+        if (!rawDate || rawValue === null) continue;
+
+        const dateStr = formatDateLabel(rawDate);
+        if (!dateStr) continue;
+
+        categorySet.add(category);
+        if (!dateMap.has(dateStr)) dateMap.set(dateStr, {});
+        const dm = dateMap.get(dateStr);
+        dm[category] = (dm[category] || 0) + rawValue;
+    }
+
+    const dates = [...dateMap.keys()];
+    const categories = [...categorySet];
+
     const colorPalette = [
         '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
         '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
@@ -161,7 +273,14 @@ function renderPerformanceChart(data) {
         borderRadius: 6,
     }));
 
-    // 기존 차트 인스턴스 정리
+    // 차트 캔버스 보장
+    if (!document.getElementById('performanceChart')) {
+        container.innerHTML = `<div class="chart-container"><canvas id="performanceChart"></canvas></div>`;
+    }
+
+    const canvas = document.getElementById('performanceChart');
+    const ctx = canvas.getContext('2d');
+
     if (performanceChartInstance) {
         performanceChartInstance.destroy();
     }
@@ -177,10 +296,10 @@ function renderPerformanceChart(data) {
                     position: 'top',
                     labels: {
                         color: '#94a3b8',
-                        font: { size: 12 },
-                        padding: 16,
+                        font: { size: 11 },
+                        padding: 12,
                         usePointStyle: true,
-                        pointStyleWidth: 12,
+                        pointStyleWidth: 10,
                     },
                 },
                 tooltip: {
@@ -190,17 +309,17 @@ function renderPerformanceChart(data) {
                     borderColor: '#2d3748',
                     borderWidth: 1,
                     cornerRadius: 8,
-                    padding: 12,
+                    padding: 10,
                 },
             },
             scales: {
                 x: {
                     grid: { color: 'rgba(45, 55, 72, 0.5)' },
-                    ticks: { color: '#64748b', font: { size: 11 } },
+                    ticks: { color: '#64748b', font: { size: 10 } },
                 },
                 y: {
                     grid: { color: 'rgba(45, 55, 72, 0.5)' },
-                    ticks: { color: '#64748b', font: { size: 11 } },
+                    ticks: { color: '#64748b', font: { size: 10 } },
                     beginAtZero: true,
                 },
             },
@@ -208,88 +327,73 @@ function renderPerformanceChart(data) {
     });
 }
 
-// ─── AI 모델 테이블 렌더링 ─────────────────────────────────────────────────
-function renderAIModels(data) {
-    const models = data.models || [];
-    const container = document.getElementById('modelsTableContainer');
+// ─── 3. iOS 트렌드 ──────────────────────────────────────────────────────────
+function renderIosTrends(data) {
+    const items = data.ios_trends || [];
+    const container = document.getElementById('iosContent');
 
-    if (models.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="icon">📭</div>
-                <div class="message">아직 AI 모델 데이터가 없습니다</div>
-            </div>
-        `;
+    if (items.length === 0) {
+        container.innerHTML = emptyStateHtml('📭', '아직 iOS 트렌드 데이터가 없습니다');
         return;
     }
 
-    // properties에서 키 추출
-    const sampleProps = models[0].properties || models[0];
-    const keys = Object.keys(sampleProps).filter(
-        k => !['id', 'created_time', 'last_edited_time', 'object'].includes(k)
-    );
-
-    // 표시할 컬럼 최대 6개로 제한
-    const displayKeys = keys.slice(0, 6);
-
-    // 컬럼명 한국어 매핑
-    const keyLabels = {
-        'Name': '이름', 'name': '이름', '이름': '이름',
-        'Model': '모델', 'model': '모델', '모델': '모델',
-        'Category': '카테고리', 'category': '카테고리', '카테고리': '카테고리',
-        'Status': '상태', 'status': '상태', '상태': '상태',
-        'Score': '점수', 'score': '점수', '점수': '점수',
-        'Provider': '제공자', 'provider': '제공자', '제공자': '제공자',
-        'Type': '유형', 'type': '유형', '유형': '유형',
-        'Description': '설명', 'description': '설명', '설명': '설명',
-        'Benchmark': '벤치마크', 'benchmark': '벤치마크', '벤치마크': '벤치마크',
-        'Date': '날짜', 'date': '날짜', '날짜': '날짜',
-    };
-
-    const thHtml = displayKeys.map(k => {
-        const label = keyLabels[k] || k;
-        return `<th>${escapeHtml(label)}</th>`;
-    }).join('');
-
-    const tbodyHtml = models.map(model => {
-        const props = model.properties || model;
-        const tds = displayKeys.map(k => {
-            const val = props[k];
-            const display = extractNotionValue(val);
-            return `<td>${escapeHtml(display)}</td>`;
-        }).join('');
-        return `<tr>${tds}</tr>`;
-    }).join('');
-
-    container.innerHTML = `
-        <table class="models-table">
-            <thead><tr>${thHtml}</tr></thead>
-            <tbody>${tbodyHtml}</tbody>
-        </table>
-    `;
+    container.innerHTML = items.map(item => createNotionCard(item, {
+        titleKeys: ['이름', 'Name', 'name', '제목', 'Title', 'title'],
+        metaKeys: ['카테고리', 'Category', 'category', '상태', 'Status', 'status', '버전', 'Version', 'version'],
+        descKeys: ['설명', 'Description', 'description', '메모', 'Note', 'note', '내용', '내용'],
+        dateKeys: ['날짜', 'Date', 'date'],
+    })).join('');
 }
 
-// ─── 트렌딩 카드 렌더링 ────────────────────────────────────────────────────
-function renderTrendingCards(data) {
+// ─── 4. 투자 메모 ───────────────────────────────────────────────────────────
+function renderInvest(data) {
+    const items = data.invest || [];
+    const container = document.getElementById('investContent');
+
+    if (items.length === 0) {
+        container.innerHTML = emptyStateHtml('📭', '아직 투자 메모가 없습니다');
+        return;
+    }
+
+    container.innerHTML = items.map(item => createNotionCard(item, {
+        titleKeys: ['이름', 'Name', 'name', '제목', 'Title', 'title', '종목', 'Ticker'],
+        metaKeys: ['카테고리', 'Category', 'category', '상태', 'Status', 'status', '유형', 'Type', 'type', '가격', 'Price', 'price'],
+        descKeys: ['설명', 'Description', 'description', '메모', 'Note', 'note', '내용', '의견', 'Comment'],
+        dateKeys: ['날짜', 'Date', 'date', '매수일', 'Buy Date'],
+    })).join('');
+}
+
+// ─── 5. 학습 로그 ───────────────────────────────────────────────────────────
+function renderLearning(data) {
+    const items = data.learning || [];
+    const container = document.getElementById('learningContent');
+
+    if (items.length === 0) {
+        container.innerHTML = emptyStateHtml('📭', '아직 학습 로그가 없습니다');
+        return;
+    }
+
+    container.innerHTML = items.map(item => createNotionCard(item, {
+        titleKeys: ['이름', 'Name', 'name', '제목', 'Title', 'title', '주제', 'Topic', 'topic'],
+        metaKeys: ['카테고리', 'Category', 'category', '상태', 'Status', 'status', '난이도', 'Level', 'level', '진행도', 'Progress'],
+        descKeys: ['설명', 'Description', 'description', '메모', 'Note', 'note', '내용', '요약', 'Summary'],
+        dateKeys: ['날짜', 'Date', 'date', '학습일', 'Start Date'],
+    })).join('');
+}
+
+// ─── 6. GitHub 트렌딩 ───────────────────────────────────────────────────────
+function renderTrending(data) {
     const repos = data.repos || [];
-    const grid = document.getElementById('trendingGrid');
+    const container = document.getElementById('trendingContent');
 
     if (repos.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state" style="grid-column: 1 / -1;">
-                <div class="icon">📭</div>
-                <div class="message">오늘의 트렌딩 리포지토리가 없습니다</div>
-            </div>
-        `;
+        container.innerHTML = emptyStateHtml('📭', '오늘의 트렌딩 리포지토리가 없습니다');
         return;
     }
 
-    allTrendingRepos = repos;
-
-    grid.innerHTML = repos.map(repo => createRepoCardHtml(repo)).join('');
+    container.innerHTML = repos.map(repo => createRepoCardHtml(repo)).join('');
 }
 
-// ─── 리포지토리 카드 HTML 생성 ──────────────────────────────────────────────
 function createRepoCardHtml(repo) {
     const name = repo.name || '';
     const description = repo.description || '설명 없음';
@@ -297,7 +401,6 @@ function createRepoCardHtml(repo) {
     const stars = formatNumber(repo.stars || 0);
     const forks = formatNumber(repo.forks || 0);
     const todayStars = repo.today_stars || 0;
-
     const langClass = getLanguageClass(language);
     const repoUrl = `https://github.com/${name}`;
 
@@ -320,6 +423,72 @@ function createRepoCardHtml(repo) {
                 <span class="repo-meta-item">⭐ ${stars}</span>
                 <span class="repo-meta-item">🍴 ${forks}</span>
             </div>
+        </div>
+    `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Notion 데이터 처리 헬퍼
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 범용 Notion 카드 생성
+ * @param {Object} item - Notion page object {id, properties}
+ * @param {Object} opts - {titleKeys, metaKeys, descKeys, dateKeys}
+ */
+function createNotionCard(item, opts) {
+    const props = item.properties || {};
+
+    // 키 매칭
+    const allKeys = Object.keys(props);
+    const titleKey = findFirstKey(allKeys, opts.titleKeys);
+    const metaKeyList = findKeys(allKeys, opts.metaKeys, 3);
+    const descKey = findFirstKey(allKeys, opts.descKeys);
+    const dateKey = findFirstKey(allKeys, opts.dateKeys);
+
+    const title = extractNotionValue(props[titleKey]) || '제목 없음';
+
+    // 메타 태그 생성
+    const tags = [];
+    // 날짜 추출: dateKey가 있으면 해당 값에서, 아니면 extractNotionDate로
+    if (dateKey) {
+        const rawVal = props[dateKey];
+        let dateStr = '';
+        if (typeof rawVal === 'string' && rawVal) {
+            dateStr = formatDateLabel(rawVal);
+        } else if (rawVal && typeof rawVal === 'object' && rawVal.date && rawVal.date.start) {
+            dateStr = formatDateLabel(rawVal.date.start);
+        }
+        if (!dateStr) {
+            const fallback = extractNotionDate(props);
+            dateStr = formatDateLabel(fallback);
+        }
+        if (dateStr) {
+            tags.push(`<span class="data-card-tag tag-accent">📅 ${escapeHtml(dateStr)}</span>`);
+        }
+    }
+    for (const k of metaKeyList) {
+        const val = extractNotionValue(props[k]);
+        if (!val) continue;
+        const label = getShortLabel(k);
+        const tagClass = getTagClass(k, val);
+        tags.push(`<span class="data-card-tag ${tagClass}">${escapeHtml(label)} ${escapeHtml(val)}</span>`);
+    }
+
+    // 설명
+    let descHtml = '';
+    if (descKey) {
+        const desc = extractNotionValue(props[descKey]);
+        if (desc) {
+            descHtml = `<div class="data-card-desc">${escapeHtml(desc)}</div>`;
+        }
+    }
+
+    return `
+        <div class="data-card">
+            <div class="data-card-title">${escapeHtml(title)}</div>
+            ${tags.length ? `<div class="data-card-meta">${tags.join('')}</div>` : ''}
+            ${descHtml}
         </div>
     `;
 }
@@ -354,15 +523,171 @@ function extractNotionValue(val) {
         if (val.email) return val.email;
         if (val.phone_number) return val.phone_number;
         if (val.status) return val.status.name || '';
-        if (val.formula) {
-            return extractNotionValue(val.formula);
-        }
-        if (val.rollup) {
-            return extractNotionValue(val.rollup);
-        }
+        if (val.formula) return extractNotionValue(val.formula);
+        if (val.rollup) return extractNotionValue(val.rollup);
     }
 
     return String(val);
+}
+
+/**
+ * Notion properties에서 날짜값 추출
+ * 스칼라 문자열("2026-04-08") 또는 Notion date 객체({date:{start:"..."}}) 모두 지원
+ */
+function extractNotionDate(props) {
+    // 날짜 키를 우선 찾기
+    const dateKeyCandidates = ['날짜', 'Date', 'date', '일자', '날짜'];
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        // Notion date 객체
+        if (typeof v === 'object' && v.date && v.date.start) {
+            return v.date.start;
+        }
+        // 스칼라 문자열 날짜 (YYYY-MM-DD 형식)
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+            return v;
+        }
+    }
+    return null;
+}
+
+/**
+ * Notion properties에서 숫자값 추출
+ * 스칼라 숫자 또는 Notion number 객체 모두 지원
+ * 키 이름으로 의미 있는 숫자 필드를 우선 찾기
+ */
+function extractNotionNumber(props) {
+    const numKeyCandidates = ['값', 'Value', 'value', '수치', '점수', 'Score', 'score', '전주 대비'];
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        // 키 이름 매칭 우선
+        const kLower = k.toLowerCase();
+        if (numKeyCandidates.some(c => c.toLowerCase() === kLower)) {
+            if (typeof v === 'number') return v;
+            if (typeof v === 'object' && v.number !== undefined) return v.number;
+        }
+    }
+    // 키 매칭 실패 시, 첫 번째 숫자 필드 반환
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        if (typeof v === 'number') return v;
+        if (typeof v === 'object' && v.number !== undefined) return v.number;
+    }
+    return null;
+}
+
+/**
+ * Notion properties에서 카테고리(select/multi_select/string) 추출
+ */
+function extractNotionCategory(props) {
+    const catKeyCandidates = ['카테고리', 'Category', 'category', '유형', 'Type', 'type'];
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        const kLower = k.toLowerCase();
+        if (catKeyCandidates.some(c => c.toLowerCase() === kLower)) {
+            if (typeof v === 'object') {
+                if (v.select && v.select.name) return v.select.name;
+                if (v.multi_select && v.multi_select.length > 0) return v.multi_select[0].name;
+            }
+            if (typeof v === 'string' && v.trim()) return v.trim();
+        }
+    }
+    // 키 매칭 실패 시 select/multi_select 객체 찾기
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v && typeof v === 'object') {
+            if (v.select && v.select.name) return v.select.name;
+            if (v.multi_select && v.multi_select.length > 0) return v.multi_select[0].name;
+        }
+    }
+    return '기타';
+}
+
+// ─── 키 매칭 헬퍼 ─────────────────────────────────────────────────────────
+/**
+ * candidates 중 allKeys에 존재하는 첫 번째 키 반환
+ */
+function findFirstKey(allKeys, candidates) {
+    for (const c of candidates) {
+        const found = allKeys.find(k => k.toLowerCase() === c.toLowerCase());
+        if (found) return found;
+    }
+    return allKeys[0] || null;
+}
+
+/**
+ * candidates 중 allKeys에 존재하는 키를 최대 maxCount개 반환
+ */
+function findKeys(allKeys, candidates, maxCount) {
+    const result = [];
+    for (const c of candidates) {
+        if (result.length >= maxCount) break;
+        const found = allKeys.find(k => k.toLowerCase() === c.toLowerCase());
+        if (found) result.push(found);
+    }
+    return result;
+}
+
+// ─── 레이블 / 스타일 헬퍼 ──────────────────────────────────────────────────
+function getShortLabel(key) {
+    const labels = {
+        '카테고리': '카테고리', 'Category': '카테고리', 'category': '카테고리',
+        '상태': '상태', 'Status': '상태', 'status': '상태',
+        '유형': '유형', 'Type': '유형', 'type': '유형',
+        '버전': '버전', 'Version': '버전', 'version': '버전',
+        '가격': '가격', 'Price': '가격', 'price': '가격',
+        '난이도': '난이도', 'Level': '난이도', 'level': '난이도',
+        '진행도': '진행도', 'Progress': '진행도', 'progress': '진행도',
+        '종목': '종목', 'Ticker': '종목', 'ticker': '종목',
+    };
+    return labels[key] || key;
+}
+
+function getTagClass(key, val) {
+    const lower = (val || '').toLowerCase();
+    if (lower === '완료' || lower === 'done' || lower === 'completed' || lower === '✅') return 'tag-success';
+    if (lower === '진행중' || lower === 'in progress' || lower === 'active') return 'tag-accent';
+    if (lower === '중요' || lower === 'important' || lower === 'urgent') return 'tag-danger';
+    if (lower === '보류' || lower === 'hold' || lower === 'pending') return 'tag-warning';
+    return '';
+}
+
+// ─── 날짜 포맷 ─────────────────────────────────────────────────────────────
+function formatDateLabel(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
+        return `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+    } catch {
+        return dateStr;
+    }
+}
+
+// ─── 빈 상태 HTML ──────────────────────────────────────────────────────────
+function emptyStateHtml(icon, message) {
+    return `
+        <div class="empty-state">
+            <div class="empty-icon">${icon}</div>
+            <div class="empty-message">${escapeHtml(message)}</div>
+        </div>
+    `;
+}
+
+// ─── 타임스탬프 ─────────────────────────────────────────────────────────────
+function updateTimestamp() {
+    const el = document.getElementById('lastUpdated');
+    if (!el) return;
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    el.textContent = `업데이트 ${h}:${m}`;
 }
 
 // ─── 유틸리티 ──────────────────────────────────────────────────────────────
