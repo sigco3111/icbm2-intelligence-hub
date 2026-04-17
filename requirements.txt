@@ -1,10 +1,9 @@
-fastapi>=0.104.0
-uvicorn>=0.24.0
-httpx>=0.25.0
-beautifulsoup4>=0.0.1
-aiosqlite>=0.19.0
-pydantic>=2.5.0
+# Vercel Python 런타임 의존성
+# @vercel/python 빌드러가 이 파일을 읽어 패키지를 설치함
+
+fastapi>=0.110.0
+uvicorn>=0.27.0
 pydantic-settings>=2.0.0
-python-dotenv>=1.0.0
-pytest>=7.4.0
-pytest-asyncio>=0.23.0
+aiosqlite>=0.19.0
+httpx>=0.27.0
+beautifulsoup4>=4.12.0
