@@ -178,16 +178,23 @@ function renderModels(data) {
         k => !['id', 'created_time', 'last_edited_time', 'object', 'cover', 'icon'].includes(k)
     );
 
-    // 카드에 표시할 속성: title → 첫 번째, 그 다음 3개
+    // 카드에 표시할 속성: title → 첫 번째 텍스트 필드, 그 다음 3개
     const titleKey = keys.find(k => {
         const v = sampleProps[k];
-        return v && typeof v === 'object' && v.title;
+        // Notion title 객체
+        if (v && typeof v === 'object' && v.title) return true;
+        // 스칼라 문자열 (긴 텍스트 = 제목일 확률 높음)
+        if (typeof v === 'string' && v.length > 10) return true;
+        return false;
     }) || keys[0];
 
     const metaKeys = keys.filter(k => k !== titleKey).slice(0, 3);
     const descKey = keys.find(k => {
         const v = sampleProps[k];
-        return v && typeof v === 'object' && (v.rich_text || (v.title && k !== titleKey));
+        if (v && typeof v === 'object' && (v.rich_text || (v.title && k !== titleKey))) return true;
+        // 스칼라 문자열 (URL은 제외)
+        if (typeof v === 'string' && v.length > 20 && !v.startsWith('http')) return true;
+        return false;
     });
 
     container.innerHTML = models.map(model => {
@@ -443,9 +450,19 @@ function createNotionCard(item, opts) {
 
     // 메타 태그 생성
     const tags = [];
+    // 날짜 추출: dateKey가 있으면 해당 값에서, 아니면 extractNotionDate로
     if (dateKey) {
-        const rawDate = extractNotionDate(props);
-        const dateStr = formatDateLabel(rawDate);
+        const rawVal = props[dateKey];
+        let dateStr = '';
+        if (typeof rawVal === 'string' && rawVal) {
+            dateStr = formatDateLabel(rawVal);
+        } else if (rawVal && typeof rawVal === 'object' && rawVal.date && rawVal.date.start) {
+            dateStr = formatDateLabel(rawVal.date.start);
+        }
+        if (!dateStr) {
+            const fallback = extractNotionDate(props);
+            dateStr = formatDateLabel(fallback);
+        }
         if (dateStr) {
             tags.push(`<span class="data-card-tag tag-accent">📅 ${escapeHtml(dateStr)}</span>`);
         }
@@ -515,12 +532,21 @@ function extractNotionValue(val) {
 
 /**
  * Notion properties에서 날짜값 추출
+ * 스칼라 문자열("2026-04-08") 또는 Notion date 객체({date:{start:"..."}}) 모두 지원
  */
 function extractNotionDate(props) {
+    // 날짜 키를 우선 찾기
+    const dateKeyCandidates = ['날짜', 'Date', 'date', '일자', '날짜'];
     for (const k of Object.keys(props)) {
         const v = props[k];
-        if (v && typeof v === 'object' && v.date && v.date.start) {
+        if (v === null || v === undefined) continue;
+        // Notion date 객체
+        if (typeof v === 'object' && v.date && v.date.start) {
             return v.date.start;
+        }
+        // 스칼라 문자열 날짜 (YYYY-MM-DD 형식)
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+            return v;
         }
     }
     return null;
@@ -528,22 +554,49 @@ function extractNotionDate(props) {
 
 /**
  * Notion properties에서 숫자값 추출
+ * 스칼라 숫자 또는 Notion number 객체 모두 지원
+ * 키 이름으로 의미 있는 숫자 필드를 우선 찾기
  */
 function extractNotionNumber(props) {
+    const numKeyCandidates = ['값', 'Value', 'value', '수치', '점수', 'Score', 'score', '전주 대비'];
     for (const k of Object.keys(props)) {
         const v = props[k];
-        if (v !== null && v !== undefined) {
+        if (v === null || v === undefined) continue;
+        // 키 이름 매칭 우선
+        const kLower = k.toLowerCase();
+        if (numKeyCandidates.some(c => c.toLowerCase() === kLower)) {
             if (typeof v === 'number') return v;
             if (typeof v === 'object' && v.number !== undefined) return v.number;
         }
+    }
+    // 키 매칭 실패 시, 첫 번째 숫자 필드 반환
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        if (typeof v === 'number') return v;
+        if (typeof v === 'object' && v.number !== undefined) return v.number;
     }
     return null;
 }
 
 /**
- * Notion properties에서 카테고리(select/multi_select) 추출
+ * Notion properties에서 카테고리(select/multi_select/string) 추출
  */
 function extractNotionCategory(props) {
+    const catKeyCandidates = ['카테고리', 'Category', 'category', '유형', 'Type', 'type'];
+    for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined) continue;
+        const kLower = k.toLowerCase();
+        if (catKeyCandidates.some(c => c.toLowerCase() === kLower)) {
+            if (typeof v === 'object') {
+                if (v.select && v.select.name) return v.select.name;
+                if (v.multi_select && v.multi_select.length > 0) return v.multi_select[0].name;
+            }
+            if (typeof v === 'string' && v.trim()) return v.trim();
+        }
+    }
+    // 키 매칭 실패 시 select/multi_select 객체 찾기
     for (const k of Object.keys(props)) {
         const v = props[k];
         if (v && typeof v === 'object') {
