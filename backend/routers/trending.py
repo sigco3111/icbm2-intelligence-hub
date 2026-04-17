@@ -81,8 +81,12 @@ async def get_daily_trending(
     crawler = _get_crawler(request)
     store = await _get_store(request)
 
-    # 트렌딩 페이지 크롤링
-    repos = await crawler.fetch_trending(language=language, since="daily")
+    try:
+        # 트렌딩 페이지 크롤링
+        repos = await crawler.fetch_trending(language=language, since="daily")
+    except Exception as e:
+        logger.error("트렌딩 크롤링 실패: %s", e)
+        return {"repos": [], "error": str(e)}
 
     # AI/iOS 키워드 필터링
     filtered = crawler.filter_by_keywords(repos, DEFAULT_FILTER_KEYWORDS)
