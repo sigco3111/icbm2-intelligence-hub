@@ -150,7 +150,7 @@ function showError(errorId, loadingId, contentId) {
 
 // ─── 1. AI 모델 트래커 ─────────────────────────────────────────────────────
 function renderModels(data) {
-    const models = data.models || [];
+    const models = sortByNewest(data.models || []);
     const container = document.getElementById('modelsContent');
 
     if (models.length === 0) {
@@ -217,7 +217,7 @@ function renderModels(data) {
 
 // ─── 3. iOS 트렌드 ──────────────────────────────────────────────────────────
 function renderIosTrends(data) {
-    const items = data.ios_trends || [];
+    const items = sortByNewest(data.ios_trends || []);
     const container = document.getElementById('iosContent');
 
     if (items.length === 0) {
@@ -235,7 +235,7 @@ function renderIosTrends(data) {
 
 // ─── 4. 학습 로그 ───────────────────────────────────────────────────────────
 function renderLearning(data) {
-    const items = data.learning || [];
+    const items = sortByNewest(data.learning || []);
     const container = document.getElementById('learningContent');
 
     if (items.length === 0) {
@@ -253,7 +253,7 @@ function renderLearning(data) {
 
 // ─── 5. GitHub 트렌딩 ───────────────────────────────────────────────────────
 function renderTrending(data) {
-    const repos = data.repos || [];
+    const repos = [...(data.repos || [])].sort((a, b) => (b.today_stars || 0) - (a.today_stars || 0));
     const container = document.getElementById('trendingContent');
 
     if (repos.length === 0) {
@@ -586,6 +586,19 @@ function updateTimestamp() {
     const h = String(now.getHours()).padStart(2, '0');
     const m = String(now.getMinutes()).padStart(2, '0');
     el.textContent = `업데이트 ${h}:${m}`;
+}
+
+// ─── Notion 데이터 정렬 헬퍼 ─────────────────────────────────────────────
+/**
+ * Notion 페이지 배열을 최신순으로 정렬합니다.
+ * last_edited_time > created_time 순으로 비교합니다.
+ */
+function sortByNewest(items) {
+    return [...items].sort((a, b) => {
+        const timeA = a.last_edited_time || a.created_time || '';
+        const timeB = b.last_edited_time || b.created_time || '';
+        return timeB.localeCompare(timeA);
+    });
 }
 
 // ─── 유틸리티 ──────────────────────────────────────────────────────────────
