@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ICBM2 Intelligence Hub</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 <body>
 
@@ -26,17 +26,9 @@
             <span class="tab-icon">🤖</span>
             <span class="tab-label">AI 모델</span>
         </button>
-        <button class="tab-btn" data-tab="performance" aria-label="성과 대시보드">
-            <span class="tab-icon">📊</span>
-            <span class="tab-label">성과</span>
-        </button>
         <button class="tab-btn" data-tab="ios" aria-label="iOS 트렌드">
             <span class="tab-icon">📱</span>
             <span class="tab-label">iOS</span>
-        </button>
-        <button class="tab-btn" data-tab="invest" aria-label="투자 메모">
-            <span class="tab-icon">📈</span>
-            <span class="tab-label">투자</span>
         </button>
         <button class="tab-btn" data-tab="learning" aria-label="학습 로그">
             <span class="tab-icon">📚</span>
@@ -69,28 +61,6 @@
             </div>
         </section>
 
-        <!-- Section: Performance -->
-        <section class="tab-panel" id="panel-performance">
-            <div class="section-header">
-                <h2 class="section-title">📊 성과 대시보드</h2>
-                <span class="badge badge-live">실시간</span>
-            </div>
-            <div id="chartLoading" class="spinner-wrapper">
-                <div class="spinner"></div>
-                <span>성과 데이터를 불러오는 중...</span>
-            </div>
-            <div id="chartContent" class="chart-card" style="display:none;">
-                <div class="chart-container">
-                    <canvas id="performanceChart"></canvas>
-                </div>
-            </div>
-            <div id="chartError" class="error-state" style="display:none;">
-                <div class="error-icon">⚠️</div>
-                <div class="error-message">성과 데이터를 불러올 수 없습니다</div>
-                <button class="retry-btn" onclick="retrySection('performance')">다시 시도</button>
-            </div>
-        </section>
-
         <!-- Section: iOS Trends -->
         <section class="tab-panel" id="panel-ios">
             <div class="section-header">
@@ -106,24 +76,6 @@
                 <div class="error-icon">⚠️</div>
                 <div class="error-message">iOS 트렌드를 불러올 수 없습니다</div>
                 <button class="retry-btn" onclick="retrySection('ios')">다시 시도</button>
-            </div>
-        </section>
-
-        <!-- Section: Invest -->
-        <section class="tab-panel" id="panel-invest">
-            <div class="section-header">
-                <h2 class="section-title">📈 투자 메모</h2>
-                <span class="badge badge-source">Notion</span>
-            </div>
-            <div id="investLoading" class="spinner-wrapper">
-                <div class="spinner"></div>
-                <span>투자 메모를 불러오는 중...</span>
-            </div>
-            <div id="investContent" class="card-list" style="display:none;"></div>
-            <div id="investError" class="error-state" style="display:none;">
-                <div class="error-icon">⚠️</div>
-                <div class="error-message">투자 메모를 불러올 수 없습니다</div>
-                <button class="retry-btn" onclick="retrySection('invest')">다시 시도</button>
             </div>
         </section>
 

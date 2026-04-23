@@ -6,14 +6,12 @@
  */
 
 // ─── 전역 상태 ──────────────────────────────────────────────────────────────
-let performanceChartInstance = null;
+let performanceChartInstance = null; // removed - no longer needed
 
 // 각 섹션별 캐시
 const sectionCache = {
     models: null,
-    performance: null,
     ios: null,
-    invest: null,
     learning: null,
     trending: null,
 };
@@ -24,17 +22,9 @@ const SECTION_CONFIG = {
         url: '/api/notion/ai-models',
         dataKey: 'models',
     },
-    performance: {
-        url: '/api/notion/performance',
-        dataKey: 'performance',
-    },
     ios: {
         url: '/api/notion/ios-trends',
         dataKey: 'ios_trends',
-    },
-    invest: {
-        url: '/api/notion/invest',
-        dataKey: 'invest',
     },
     learning: {
         url: '/api/notion/learning',
@@ -49,9 +39,7 @@ const SECTION_CONFIG = {
 // 섹션별 ID 매핑
 const SECTION_IDS = {
     models:      { loading: 'modelsLoading',    content: 'modelsContent',    error: 'modelsError' },
-    performance: { loading: 'chartLoading',     content: 'chartContent',     error: 'chartError' },
     ios:         { loading: 'iosLoading',       content: 'iosContent',       error: 'iosError' },
-    invest:      { loading: 'investLoading',    content: 'investContent',    error: 'investError' },
     learning:    { loading: 'learningLoading',  content: 'learningContent',  error: 'learningError' },
     trending:    { loading: 'trendingLoading',  content: 'trendingContent',  error: 'trendingError' },
 };
@@ -128,9 +116,7 @@ function retrySection(sectionKey) {
 function renderSection(sectionKey, data) {
     switch (sectionKey) {
         case 'models':      renderModels(data); break;
-        case 'performance': renderPerformanceChart(data); break;
         case 'ios':         renderIosTrends(data); break;
-        case 'invest':      renderInvest(data); break;
         case 'learning':    renderLearning(data); break;
         case 'trending':    renderTrending(data); break;
     }
@@ -229,108 +215,6 @@ function renderModels(data) {
     }).join('');
 }
 
-// ─── 2. 성과 대시보드 (Chart.js) ───────────────────────────────────────────
-function renderPerformanceChart(data) {
-    const items = data.performance || [];
-    const container = document.getElementById('chartContent');
-
-    if (items.length === 0) {
-        container.innerHTML = `<div class="chart-card">${emptyStateHtml('📭', '아직 성과 데이터가 없습니다')}</div>`;
-        return;
-    }
-
-    // Notion property 처리
-    const dateMap = new Map();
-    const categorySet = new Set();
-
-    for (const item of items) {
-        const props = item.properties || item;
-        const rawDate = extractNotionDate(props);
-        const rawValue = extractNotionNumber(props);
-        const category = extractNotionCategory(props);
-
-        if (!rawDate || rawValue === null) continue;
-
-        const dateStr = formatDateLabel(rawDate);
-        if (!dateStr) continue;
-
-        categorySet.add(category);
-        if (!dateMap.has(dateStr)) dateMap.set(dateStr, {});
-        const dm = dateMap.get(dateStr);
-        dm[category] = (dm[category] || 0) + rawValue;
-    }
-
-    const dates = [...dateMap.keys()];
-    const categories = [...categorySet];
-
-    const colorPalette = [
-        '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
-        '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
-    ];
-
-    const datasets = categories.map((cat, i) => ({
-        label: cat,
-        data: dates.map(d => dateMap.get(d)[cat] || 0),
-        backgroundColor: colorPalette[i % colorPalette.length] + 'cc',
-        borderColor: colorPalette[i % colorPalette.length],
-        borderWidth: 1,
-        borderRadius: 6,
-    }));
-
-    // 차트 캔버스 보장
-    if (!document.getElementById('performanceChart')) {
-        container.innerHTML = `<div class="chart-container"><canvas id="performanceChart"></canvas></div>`;
-    }
-
-    const canvas = document.getElementById('performanceChart');
-    const ctx = canvas.getContext('2d');
-
-    if (performanceChartInstance) {
-        performanceChartInstance.destroy();
-    }
-
-    performanceChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: dates, datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        color: '#94a3b8',
-                        font: { size: 11 },
-                        padding: 12,
-                        usePointStyle: true,
-                        pointStyleWidth: 10,
-                    },
-                },
-                tooltip: {
-                    backgroundColor: '#1a1d2e',
-                    titleColor: '#e2e8f0',
-                    bodyColor: '#94a3b8',
-                    borderColor: '#2d3748',
-                    borderWidth: 1,
-                    cornerRadius: 8,
-                    padding: 10,
-                },
-            },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(45, 55, 72, 0.5)' },
-                    ticks: { color: '#64748b', font: { size: 10 } },
-                },
-                y: {
-                    grid: { color: 'rgba(45, 55, 72, 0.5)' },
-                    ticks: { color: '#64748b', font: { size: 10 } },
-                    beginAtZero: true,
-                },
-            },
-        },
-    });
-}
-
 // ─── 3. iOS 트렌드 ──────────────────────────────────────────────────────────
 function renderIosTrends(data) {
     const items = data.ios_trends || [];
@@ -349,25 +233,7 @@ function renderIosTrends(data) {
     })).join('');
 }
 
-// ─── 4. 투자 메모 ───────────────────────────────────────────────────────────
-function renderInvest(data) {
-    const items = data.invest || [];
-    const container = document.getElementById('investContent');
-
-    if (items.length === 0) {
-        container.innerHTML = emptyStateHtml('📭', '아직 투자 메모가 없습니다');
-        return;
-    }
-
-    container.innerHTML = items.map(item => createNotionCard(item, {
-        titleKeys: ['이름', 'Name', 'name', '제목', 'Title', 'title', '종목', 'Ticker'],
-        metaKeys: ['카테고리', 'Category', 'category', '상태', 'Status', 'status', '유형', 'Type', 'type', '가격', 'Price', 'price'],
-        descKeys: ['설명', 'Description', 'description', '메모', 'Note', 'note', '내용', '의견', 'Comment'],
-        dateKeys: ['날짜', 'Date', 'date', '매수일', 'Buy Date'],
-    })).join('');
-}
-
-// ─── 5. 학습 로그 ───────────────────────────────────────────────────────────
+// ─── 4. 학습 로그 ───────────────────────────────────────────────────────────
 function renderLearning(data) {
     const items = data.learning || [];
     const container = document.getElementById('learningContent');
@@ -385,7 +251,7 @@ function renderLearning(data) {
     })).join('');
 }
 
-// ─── 6. GitHub 트렌딩 ───────────────────────────────────────────────────────
+// ─── 5. GitHub 트렌딩 ───────────────────────────────────────────────────────
 function renderTrending(data) {
     const repos = data.repos || [];
     const container = document.getElementById('trendingContent');

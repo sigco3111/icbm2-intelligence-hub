@@ -148,10 +148,10 @@ class GitHubTrendingCrawler:
             language = lang_tag.get_text(strip=True) if lang_tag else ""
 
             # ── 스타 수 ──
-            stars_count = self._parse_link_number(article, "href$='/stargazers'")
+            stars_count = self._get_stars_count(article)
 
             # ── 포크 수 ──
-            forks_count = self._parse_link_number(article, "href$='/forks'")
+            forks_count = self._get_forks_count(article)
 
             # ── 기간별 스타 수 (예: "★ 123 today") ──
             today_stars = self._parse_period_stars(article)
@@ -192,6 +192,33 @@ class GitHubTrendingCrawler:
                 return int(match.group())
         return 0
 
+    def _get_stars_count(self, article: "BeautifulSoup") -> int:
+        """스타 수를 추출합니다. 여러 선택자를 순차적으로 시도합니다."""
+        for selector in [
+            'a[href*="/stargazers"]',
+            'a.Link--muted[href*="stargazers"]',
+        ]:
+            link = article.select_one(selector)
+            if link:
+                text = link.get_text(strip=True).replace(",", "")
+                match = re.search(r"\d+", text)
+                if match:
+                    return int(match.group())
+        return 0
+
+    def _get_forks_count(self, article: "BeautifulSoup") -> int:
+        """포크 수를 추출합니다. 여러 선택자를 순차적으로 시도합니다."""
+        for selector in [
+            'a[href*="/forks"]',
+            'a.Link--muted[href*="forks"]',
+        ]:
+            link = article.select_one(selector)
+            if link:
+                text = link.get_text(strip=True).replace(",", "")
+                match = re.search(r"\d+", text)
+                if match:
+                    return int(match.group())
+        return 0
     @staticmethod
     def _parse_period_stars(article: "BeautifulSoup") -> int:
         """기간별 스타 수를 파싱합니다 (예: "★ 123 today", "★ 1,234 this week").
